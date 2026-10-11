@@ -3,8 +3,7 @@ name: Compiler APK AFRICA NICHES
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +13,10 @@ jobs:
   build-apk:
     name: Compilation Android
     runs-on: ubuntu-latest
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Recuperer le code source
@@ -25,39 +28,46 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Configurer les outils Android
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '12266719'
-          accept-android-sdk-licenses: true
-
-      - name: Installer les paquets Android
+      - name: Localiser le SDK Android
         shell: bash
         run: |
-          sdkmanager --install "platform-tools"
-          sdkmanager --install "platforms;android-35"
-          sdkmanager --install "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls -la "$ANDROID_HOME"
+          find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f
 
-      - name: Installer Gradle
+      - name: Accepter les licences Android
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERREUR : sdkmanager introuvable"
+            exit 1
+          fi
+          echo "SDK Manager : $SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+
+      - name: Installer les composants Android
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)"
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "platform-tools"
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "platforms;android-35"
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "build-tools;35.0.0"
+
+      - name: Installer Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Verifier le projet Android
+      - name: Verifier les fichiers du projet
         shell: bash
         run: |
-          echo "Racine du depot :"
+          pwd
           ls -la
-          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
-            echo "ERREUR : fichier settings.gradle introuvable a la racine"
-            exit 1
-          fi
-          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
-            echo "ERREUR : fichier Gradle de l'application introuvable"
-            exit 1
-          fi
+          test -f settings.gradle -o -f settings.gradle.kts
+          test -f app/build.gradle -o -f app/build.gradle.kts
 
-      - name: Compiler APK debug
+      - name: Compiler l'APK
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Publier l'APK
