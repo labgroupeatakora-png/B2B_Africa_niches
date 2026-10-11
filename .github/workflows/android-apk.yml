@@ -35,6 +35,18 @@ jobs:
             platforms;android-35
             build-tools;35.0.0
 
+      - name: Installer les outils Android
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          accept-android-sdk-licenses: true
+
+      - name: Installer les composants SDK
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
       - name: Installer Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
